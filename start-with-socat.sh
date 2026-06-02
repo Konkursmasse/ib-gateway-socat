@@ -35,14 +35,13 @@ if [ -n "$IBKR_TOTP_SECRET" ]; then
           CODE=$(python3 -c "import pyotp,os; print(pyotp.TOTP(os.environ['IBKR_TOTP_SECRET']).now())" 2>/dev/null)
           if [ -n "$CODE" ]; then
             echo "[totp-watcher] Second-Factor-Dialog erkannt — tippe TOTP-Code (Win=$WIN)"
-            # Xvfb hat kein _NET_ACTIVE_WINDOW — daher windowactivate
-            # vermeiden und direkt --window am type/key benutzen.
-            xdotool windowfocus "$WIN" 2>/dev/null
-            xdotool windowraise "$WIN" 2>/dev/null
+            # Java/Swing-Windows reagieren auf XSendEvent (--window) zuverlaessig
+            # wenn KeyPress NICHT die Z-order veraendert. Daher windowfocus
+            # bewusst weglassen und direkt KeyEvents ans Window-ID senden.
+            # Vorher: xdotool windowfocus loeste sofort "Lost focus" aus → Dialog weg.
+            xdotool key --window "$WIN" --clearmodifiers --delay 100 $(echo "$CODE" | sed 's/./& /g')
             sleep 0.3
-            xdotool type --window "$WIN" --delay 80 "$CODE"
-            sleep 0.3
-            xdotool key --window "$WIN" Return
+            xdotool key --window "$WIN" --clearmodifiers Return
             echo "[totp-watcher] code=$CODE eingetippt + Enter"
             last_submit=$now
           fi
