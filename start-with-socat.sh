@@ -48,15 +48,32 @@ if [ -n "$IBKR_TOTP_SECRET" ]; then
         if [ $((now - last_submit)) -gt 90 ]; then
           CODE=$(python3 -c "import pyotp,os; print(pyotp.TOTP(os.environ['IBKR_TOTP_SECRET']).now())" 2>/dev/null)
           if [ -n "$CODE" ]; then
-            echo "[totp-watcher] Second-Factor-Dialog erkannt — tippe TOTP-Code (Win=$WIN)"
-            # Java/Swing-Windows reagieren auf XSendEvent (--window) zuverlaessig
-            # wenn KeyPress NICHT die Z-order veraendert. Daher windowfocus
-            # bewusst weglassen und direkt KeyEvents ans Window-ID senden.
-            # Vorher: xdotool windowfocus loeste sofort "Lost focus" aus → Dialog weg.
-            xdotool key --window "$WIN" --clearmodifiers --delay 100 $(echo "$CODE" | sed 's/./& /g')
+            echo "[totp-watcher] Second-Factor-Dialog erkannt (Win=$WIN)"
+            # Phase 1: Methoden-Auswahl ueberspringen.
+            # IBKR-2FA-Dialog hat zuerst Buttons "IBKR Mobile" und "Authenticator App"
+            # in dieser Reihenfolge. Tab→Tab→Enter = Authenticator App klicken.
+            # Wenn der Dialog SCHON im Code-Feld-Modus ist, schadet Tab+Tab+Enter
+            # nicht weil Tab nur den Focus zwischen Code-Feld/OK/Cancel verschiebt
+            # und Enter dann OK ausloest (oder Cancel = harmlos weil naechster
+            # Retry kommt).
+            xdotool key --window "$WIN" --clearmodifiers Tab
+            sleep 0.4
+            xdotool key --window "$WIN" --clearmodifiers Tab
+            sleep 0.4
+            xdotool key --window "$WIN" --clearmodifiers space
+            echo "[totp-watcher] Tab+Tab+Space → Authenticator App geklickt"
+            sleep 2
+            # Phase 2: Code-Feld sollte da sein — Window re-suchen falls Dialog
+            # erneuert wurde (manche Apps schliessen alten Dialog + oeffnen neuen).
+            WIN2=$(xdotool search --name "Second Factor Authentication" 2>/dev/null | head -1)
+            WIN2="${WIN2:-$WIN}"
+            # Aktuellen TOTP-Code generieren (frisch, weil Methoden-Klick 2 sec gedauert)
+            CODE2=$(python3 -c "import pyotp,os; print(pyotp.TOTP(os.environ['IBKR_TOTP_SECRET']).now())" 2>/dev/null)
+            CODE2="${CODE2:-$CODE}"
+            xdotool key --window "$WIN2" --clearmodifiers --delay 100 $(echo "$CODE2" | sed 's/./& /g')
             sleep 0.3
-            xdotool key --window "$WIN" --clearmodifiers Return
-            echo "[totp-watcher] code=$CODE eingetippt + Enter"
+            xdotool key --window "$WIN2" --clearmodifiers Return
+            echo "[totp-watcher] code=$CODE2 eingetippt + Enter (Win=$WIN2)"
             last_submit=$now
           fi
         fi
