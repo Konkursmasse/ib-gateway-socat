@@ -24,5 +24,11 @@ socat TCP-LISTEN:4003,bind=0.0.0.0,reuseaddr,fork TCP:127.0.0.1:4001 &
 socat TCP-LISTEN:4004,bind=0.0.0.0,reuseaddr,fork TCP:127.0.0.1:4002 &
 echo "[socat-bridge] bridges active: 4003->4001 (live), 4004->4002 (paper)"
 
+# NoVNC: web-VNC auf Port 6080 → bridges zum lokalen VNC-Server (5900)
+# damit User via Browser ohne extra VNC-Client den IB Gateway GUI sieht.
+echo "[novnc] starting websockify on :6080 -> 127.0.0.1:5900"
+websockify --web=/usr/share/novnc/ 0.0.0.0:6080 127.0.0.1:5900 &
+echo "[novnc] active — browse to https://<railway-domain>/vnc.html"
+
 # Wait on upstream — if it exits, container exits too
 wait $UPSTREAM_PID
