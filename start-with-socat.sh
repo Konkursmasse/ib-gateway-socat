@@ -10,10 +10,15 @@
 
 IBC_CONFIG=/home/ibgateway/ibc/config.ini
 if [ -f "$IBC_CONFIG" ]; then
-  sed -i '/^SecondFactorDevice=/d; /^ReloginAfterSecondFactorAuthenticationTimeout=/d' "$IBC_CONFIG"
+  # WICHTIG: ReloginAfter... MUSS auf "no" — sonst killt IBC nach 251s die
+  # erfolgreich offene Session und triggert neuen 2FA-Dialog (User-Hell).
+  sed -i '/^SecondFactorDevice=/d; /^ReloginAfterSecondFactorAuthenticationTimeout=/d; /^ExistingSessionDetectedAction=/d' "$IBC_CONFIG"
   echo "SecondFactorDevice=Authenticator App" >> "$IBC_CONFIG"
-  echo "ReloginAfterSecondFactorAuthenticationTimeout=yes" >> "$IBC_CONFIG"
-  echo "[ibc-patch] config.ini patched"
+  echo "ReloginAfterSecondFactorAuthenticationTimeout=no" >> "$IBC_CONFIG"
+  # Agent reconnected/disconnected staendig (Client 50) — primary = bestehende
+  # Session bleibt, neue Anfragen werden ohne neue 2FA durchgelassen.
+  echo "ExistingSessionDetectedAction=primary" >> "$IBC_CONFIG"
+  echo "[ibc-patch] config.ini patched: ReloginAfter=no, ExistingSession=primary"
 fi
 
 # IB Gateway jts.ini: Pre-set SecondFactorDevice damit IB Gateway selber
