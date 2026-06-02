@@ -35,11 +35,15 @@ if [ -n "$IBKR_TOTP_SECRET" ]; then
           CODE=$(python3 -c "import pyotp,os; print(pyotp.TOTP(os.environ['IBKR_TOTP_SECRET']).now())" 2>/dev/null)
           if [ -n "$CODE" ]; then
             echo "[totp-watcher] Second-Factor-Dialog erkannt — tippe TOTP-Code (Win=$WIN)"
-            xdotool windowactivate --sync "$WIN"
-            sleep 0.5
-            xdotool type --delay 50 "$CODE"
+            # Xvfb hat kein _NET_ACTIVE_WINDOW — daher windowactivate
+            # vermeiden und direkt --window am type/key benutzen.
+            xdotool windowfocus "$WIN" 2>/dev/null
+            xdotool windowraise "$WIN" 2>/dev/null
             sleep 0.3
-            xdotool key Return
+            xdotool type --window "$WIN" --delay 80 "$CODE"
+            sleep 0.3
+            xdotool key --window "$WIN" Return
+            echo "[totp-watcher] code=$CODE eingetippt + Enter"
             last_submit=$now
           fi
         fi
