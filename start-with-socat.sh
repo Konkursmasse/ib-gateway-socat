@@ -3,19 +3,41 @@
 # then socat-bridge 0.0.0.0:4003 -> 127.0.0.1:4001 (live)
 # so other Railway containers can reach the IB Gateway API socket via internal DNS.
 
-# IBC config.ini patchen: SecondFactorDevice=Authenticator App damit der
-# Methoden-Auswahl-Dialog im 2FA übersprungen wird. ENV-Vars werden von IBC
-# NICHT als Override verstanden — nur direkt geschriebene config.ini-Lines.
+# IBC config.ini + IB-Gateway eigene jts.ini patchen.
+# IB Gateway speichert die zuletzt gewaehlte 2FA-Methode in jts.ini → patchen
+# wir die direkt mit "Authenticator App" damit der Methoden-Auswahl-Dialog
+# komplett uebersprungen wird.
+
 IBC_CONFIG=/home/ibgateway/ibc/config.ini
 if [ -f "$IBC_CONFIG" ]; then
-  # alte SecondFactorDevice/ReloginAfterSecondFactor-Zeilen entfernen + neu setzen
   sed -i '/^SecondFactorDevice=/d; /^ReloginAfterSecondFactorAuthenticationTimeout=/d' "$IBC_CONFIG"
   echo "SecondFactorDevice=Authenticator App" >> "$IBC_CONFIG"
   echo "ReloginAfterSecondFactorAuthenticationTimeout=yes" >> "$IBC_CONFIG"
-  echo "[ibc-patch] config.ini patched: SecondFactorDevice=Authenticator App"
-else
-  echo "[ibc-patch] WARN: $IBC_CONFIG nicht da — IBC default config verbleibt"
+  echo "[ibc-patch] config.ini patched"
 fi
+
+# IB Gateway jts.ini: Pre-set SecondFactorDevice damit IB Gateway selber
+# direkt Authenticator nimmt ohne den Auswahl-Dialog zu zeigen.
+JTS_DIR=/home/ibgateway/Jts
+JTS_INI="$JTS_DIR/jts.ini"
+mkdir -p "$JTS_DIR"
+if [ -f "$JTS_INI" ]; then
+  # entferne alte Eintraege
+  sed -i '/^SecondFactorDevice=/d' "$JTS_INI"
+fi
+# [Logon] section anlegen falls fehlt + SecondFactorDevice setzen
+python3 - <<'PYEOF'
+import os, configparser
+p = '/home/ibgateway/Jts/jts.ini'
+cfg = configparser.ConfigParser(strict=False)
+if os.path.exists(p):
+    try: cfg.read(p)
+    except Exception: pass
+if not cfg.has_section('Logon'): cfg.add_section('Logon')
+cfg.set('Logon','SecondFactorDevice','Authenticator App')
+with open(p,'w') as f: cfg.write(f)
+print('[jts-patch] jts.ini SecondFactorDevice=Authenticator App gesetzt')
+PYEOF
 
 # Start original entrypoint in background.
 # gnzsnz's run.sh lives at $HOME/scripts/run.sh
