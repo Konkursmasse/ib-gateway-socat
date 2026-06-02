@@ -3,6 +3,20 @@
 # then socat-bridge 0.0.0.0:4003 -> 127.0.0.1:4001 (live)
 # so other Railway containers can reach the IB Gateway API socket via internal DNS.
 
+# IBC config.ini patchen: SecondFactorDevice=Authenticator App damit der
+# Methoden-Auswahl-Dialog im 2FA übersprungen wird. ENV-Vars werden von IBC
+# NICHT als Override verstanden — nur direkt geschriebene config.ini-Lines.
+IBC_CONFIG=/home/ibgateway/ibc/config.ini
+if [ -f "$IBC_CONFIG" ]; then
+  # alte SecondFactorDevice/ReloginAfterSecondFactor-Zeilen entfernen + neu setzen
+  sed -i '/^SecondFactorDevice=/d; /^ReloginAfterSecondFactorAuthenticationTimeout=/d' "$IBC_CONFIG"
+  echo "SecondFactorDevice=Authenticator App" >> "$IBC_CONFIG"
+  echo "ReloginAfterSecondFactorAuthenticationTimeout=yes" >> "$IBC_CONFIG"
+  echo "[ibc-patch] config.ini patched: SecondFactorDevice=Authenticator App"
+else
+  echo "[ibc-patch] WARN: $IBC_CONFIG nicht da — IBC default config verbleibt"
+fi
+
 # Start original entrypoint in background.
 # gnzsnz's run.sh lives at $HOME/scripts/run.sh
 /home/ibgateway/scripts/run.sh &
